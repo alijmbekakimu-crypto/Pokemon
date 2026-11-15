@@ -139,3 +139,111 @@ TTS_FIXES = {
     "PlayStation 5": "Плейстейшен пять",
     "Леонида-Кис": "Леонида Кис",
 }
+
+
+# ---------- English version (narration by a real-sounding AI voice) ----------
+
+CHAPTERS_EN = [
+    {
+        "title": "GTA VI",
+        "subtitle": "What we know about the story",
+        "scene": "night_vice",
+        "intro": True,
+        "lines": [
+            "GTA 6 is only days away.",
+            "Rockstar is keeping the story under wraps, but the trailers have already told us a lot.",
+            "So let's put together everything we know.",
+        ],
+    },
+    {
+        "title": "LEONIDA",
+        "subtitle": "The Sunshine State",
+        "scene": "beach_vice",
+        "lines": [
+            "The game is set in Leonida, a fictional take on modern-day Florida.",
+            "At its heart is Vice City: neon, beaches, nightclubs, yachts, and very questionable money.",
+            "But Leonida is much bigger than one city. The Keys, the Grassrivers swamps, Port Gellhorn, Ambrosia, and the mountains of Kalaga National Park.",
+            "The sunniest place in America, with a very dark side.",
+        ],
+    },
+    {
+        "title": "LUCIA CAMINOS",
+        "subtitle": "The first protagonist",
+        "scene": "prison",
+        "lines": [
+            "Meet Lucia Caminos.",
+            "She did time in the Leonida Penitentiary, and according to Rockstar, she ended up there fighting for her family.",
+            "Now she's out, and she's done playing by someone else's rules.",
+        ],
+    },
+    {
+        "title": "JASON DUVAL",
+        "subtitle": "The Leonida Keys",
+        "scene": "keys",
+        "lines": [
+            "Then there's Jason Duval.",
+            "He grew up around grifters and crooks, served in the army, and wanted an easy life.",
+            "Instead, he's running jobs for drug smugglers down in the Keys.",
+        ],
+    },
+    {
+        "title": "BONNIE & CLYDE",
+        "subtitle": "One score, two people",
+        "scene": "neon_heist",
+        "lines": [
+            "Lucia and Jason are a couple. A modern-day Bonnie and Clyde.",
+            "The odds were never on their side, so they go for one easy job.",
+            "It goes wrong.",
+            "Now they're caught in a criminal conspiracy that stretches across the entire state.",
+            "And to survive, they'll have to trust each other more than ever.",
+        ],
+    },
+    {
+        "title": "THE CREW",
+        "subtitle": "Who else is in the game",
+        "scene": "night_club",
+        "lines": [
+            "Rockstar has also revealed the people around them.",
+            "Cal Hampton, Jason's friend, a homebody who listens in on Coast Guard radio.",
+            "Boobie Ike, a Vice City legend with a club, real estate, and a record label.",
+            "And Raul, a seasoned bank robber always looking for new talent.",
+        ],
+    },
+    {
+        "title": "THEORIES",
+        "subtitle": "Fan speculation",
+        "scene": "swamp",
+        "lines": [
+            "Now, none of this is confirmed. These are just theories.",
+            "One: someone gets betrayed. The trailers keep coming back to trust.",
+            "Two: the conspiracy may reach the people who are supposed to uphold the law.",
+            "We'll find out very soon.",
+        ],
+    },
+    {
+        "title": "NOVEMBER 19",
+        "subtitle": "PlayStation 5 · Xbox Series X|S",
+        "scene": "sunrise_vice",
+        "lines": [
+            "GTA 6 launches November 19th on PlayStation 5 and Xbox Series X and S.",
+            "Which theory do you believe? Tell me in the comments, and subscribe for the full story breakdown after launch.",
+        ],
+    },
+]
+
+SHORT_EN = [
+    {
+        "title": "GTA VI",
+        "subtitle": "3 story facts",
+        "scene": "night_vice",
+        "intro": True,
+        "lines": ["Three things you need to know about the GTA 6 story."],
+    },
+    {"title": "1. LUCIA", "subtitle": "", "scene": "prison",
+     "lines": ["Lucia just got out of prison, where she ended up fighting for her family."]},
+    {"title": "2. JASON", "subtitle": "", "scene": "keys",
+     "lines": ["Jason is an army veteran running jobs for smugglers in the Keys."]},
+    {"title": "3. THE SCORE", "subtitle": "", "scene": "neon_heist",
+     "lines": ["One easy job goes wrong, and they're pulled into a statewide conspiracy.",
+               "Out November 19th. Follow for more."]},
+]

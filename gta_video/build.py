@@ -14,7 +14,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 import scenes
-from script import CHAPTERS, SHORT, TTS_FIXES
+from script import CHAPTERS, CHAPTERS_EN, SHORT, SHORT_EN, TTS_FIXES
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BUILD = os.path.join(HERE, "build")
@@ -27,7 +27,28 @@ FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
 MODES = {
     "long": dict(chapters=CHAPTERS, size=(1920, 1080), bg=(2304, 1296), name="gta6_syuzhet_razbor.mp4"),
     "short": dict(chapters=SHORT, size=(1080, 1920), bg=(1296, 2304), name="gta6_short.mp4"),
+    # английские версии: озвучка берётся из voice_en/NN.mp3 (по файлу на реплику,
+    # в порядке CHAPTERS_EN, затем SHORT_EN) — см. import_voice()
+    "long_en": dict(chapters=CHAPTERS_EN, size=(1920, 1080), bg=(2304, 1296), name="gta6_story_explained_EN.mp4"),
+    "short_en": dict(chapters=SHORT_EN, size=(1080, 1920), bg=(1296, 2304), name="gta6_short_EN.mp4"),
 }
+VOICE_EN = os.path.join(HERE, "voice_en")
+
+
+def import_voice():
+    """Готовая дикторская озвучка (mp3 на каждую реплику) -> wav-кэш сборки."""
+    n = 0
+    for mode in ("long_en", "short_en"):
+        for ci, ch in enumerate(MODES[mode]["chapters"]):
+            for li, _ in enumerate(ch["lines"]):
+                src = os.path.join(VOICE_EN, f"{n:02d}.mp3")
+                dst = os.path.join(BUILD, f"tts_{mode}_{ci:02d}_{li:02d}.wav")
+                n += 1
+                if not os.path.exists(src):
+                    raise SystemExit(f"нет файла озвучки {src}")
+                run(["ffmpeg", "-y", "-i", src, "-ar", str(SR), "-ac", "1", "-af",
+                     "silenceremove=start_periods=1:start_threshold=-50dB,areverse,"
+                     "silenceremove=start_periods=1:start_threshold=-50dB,areverse,loudnorm=I=-16:TP=-1.5", dst])
 
 
 def run(cmd):
@@ -317,7 +338,7 @@ def build(mode):
 
 # ---------- превью ----------
 
-def thumb():
+def thumb(lines=("ЧТО ИЗВЕСТНО", "О СЮЖЕТЕ"), name="gta6_thumbnail.png"):
     os.makedirs(OUT, exist_ok=True)
     bg = os.path.join(BUILD, "bg_thumb.png")
     scenes.render("night_vice", bg, seed=11, size=(1280, 720))
@@ -332,14 +353,22 @@ def thumb():
     d = ImageDraw.Draw(img)
     d.text((70, 40), "GTA 6", font=big, fill=(255, 255, 255), stroke_width=8, stroke_fill=(255, 60, 180))
     d.rectangle([60, 360, 1220, 470], fill=(60, 220, 255))
-    d.text((84, 372), "ЧТО ИЗВЕСТНО", font=mid, fill=(10, 6, 30))
-    d.rectangle([60, 490, 920, 600], fill=(255, 220, 60))
-    d.text((84, 502), "О СЮЖЕТЕ", font=mid, fill=(10, 6, 30))
-    img.save(os.path.join(OUT, "gta6_thumbnail.png"))
+    d.text((84, 372), lines[0], font=mid, fill=(10, 6, 30))
+    d.rectangle([60, 490, 84 + int(d.textlength(lines[1], font=mid)) + 40, 600], fill=(255, 220, 60))
+    d.text((84, 502), lines[1], font=mid, fill=(10, 6, 30))
+    img.save(os.path.join(OUT, name))
     print("готово: превью")
 
 
 if __name__ == "__main__":
     what = sys.argv[1:] or ["long", "short", "thumb"]
     for m in what:
-        thumb() if m == "thumb" else build(m)
+        if m == "thumb":
+            thumb()
+        elif m == "thumb_en":
+            thumb(("WHAT WE KNOW", "ABOUT THE STORY"), "gta6_thumbnail_EN.png")
+        else:
+            if m.endswith("_en"):
+                os.makedirs(BUILD, exist_ok=True)
+                import_voice()
+            build(m)
