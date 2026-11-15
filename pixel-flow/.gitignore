@@ -1,2 +1,4 @@
 __pycache__/
 *.wav
+good-boy-exe/out/film/chapters/
+good-boy-exe/out/film/*.mp4

@@ -216,3 +216,250 @@ def crate_glow(w, x, ybot, glow):
     amt = np.clip(1 - d / 13, 0, 1) * glow * 0.6
     m = (yy < top) & (amt > bayer(H, W))
     w[m] = ((w[m].astype(np.float32) + (70, 190, 220)) / 2).astype(np.uint8)
+
+
+# ================================================================== film cast (v2)
+_BOLT_SIT = [
+    "..................kk..kk....",
+    "..................kwk.kwk...",
+    "..................kwgkkwgk..",
+    ".................kwwwwwwwwk.",
+    ".................kwwwwwwwwk.",
+    ".................kwwwwdccwk.",
+    ".................kgwwwwwwwwk",
+    "..............kkkgwwwwwwwddk",
+    ".............kwwwwgggwwwwwkk",
+    "............kwwwwwwggkkkkkk.",
+    "...........kwwwwwwwgk.......",
+    "..........kwwyywwwwgk.......",
+    ".........kwwwwwwwwgdk.......",
+    "........kwwwwwwwwwgkkgk.....",
+    "........kggwwwwwwgk.kgk.....",
+    "y......kdgggggggdk..kgk.....",
+    "kkkk...kddkkkkkddk..kwk.....",
+    ".......kkkkkkkkkkk.kkkkk....",
+]
+_BOLT_SLEEP = [
+    "....................kk..kk....",
+    "....................kwk.kwk...",
+    "...................kwwwwwwwwk.",
+    "...................kwwwwddwwk.",
+    "..kkkkkkkkkkkkkkkkkgwwwwwwwwkk",
+    ".kwwwwwwwwwwwwwwwwwgwwwwwwddk.",
+    ".kwwwwwwwyywwwwwwwwggkkkkkkk..",
+    ".kgggggggggggggggggggk........",
+    "kkdkkkkkkkkkkkkkkkkdddkk......",
+    "ky............................",
+]
+OLD_DOG_PAL = {'w': (222, 170, 96), 'g': (186, 130, 70), 'd': (128, 84, 48), 'c': (34, 22, 20),
+               'y': (186, 130, 70), 'k': (58, 34, 24)}
+UNIT01_PAL = {'w': (150, 122, 106), 'g': (112, 88, 80), 'd': (70, 56, 58), 'c': EYE_RED, 'y': (255, 120, 40)}
+EYE_PALS = {'on': {}, 'off': {'c': EYE_OFF}, 'red': {'c': EYE_RED}, 'blink': {'c': PAL['g']}}
+
+_cache2 = {}
+
+
+def dog(kind='bolt', pose='A', eye='on'):
+    """kind: bolt | old | unit01 ; pose: A B C (legs) | sit | sleep"""
+    key = (kind, pose, eye)
+    if key in _cache2:
+        return _cache2[key]
+    rows = {'sit': _BOLT_SIT, 'sleep': _BOLT_SLEEP}.get(pose)
+    if rows is None:
+        rows = _BOLT_TOP + _LEGS[pose]
+    pal = {}
+    if kind == 'old':
+        pal.update(OLD_DOG_PAL)
+    elif kind == 'unit01':
+        pal.update(UNIT01_PAL)
+    if kind != 'old':
+        pal.update(EYE_PALS.get(eye, {}))
+    if kind == 'unit01' and eye == 'off':
+        pal['c'] = (60, 30, 30)
+    _cache2[key] = Sprite(rows, pal)
+    return _cache2[key]
+
+
+_MIRA_WALK = [
+    "..kOOYYYYYYk..",
+    "..kOOOOOOOOk..",
+    "...kkjjjjkk...",
+    "...kjjk.kjjk..",
+    "..kjjk...kjjk.",
+    "..kjjk...kjjk.",
+    ".kRRRk...kRRRk",
+    ".kRRRRk..kRRRk",
+    ".kkkkkk..kkkkk",
+]
+_MIRA_BODY = [
+    "..kOYYYYYYYk..",
+    "..kOYkYYYYYk..",
+    "..kOYkYYYYYk..",
+    "..kOYkYYYYYk..",
+    "..kOskYYYYYk..",
+]
+_MIRA_KNEEL = [
+    "..kOYYYYYYYYkk",
+    "..kOYYYYYYYYss",
+    "..kOOYYYYYYk..",
+    "..kOOOOOOOOk..",
+    ".kjjjjjjjjjk..",
+    ".kRRRkkkkkk...",
+    ".kkkkk........",
+]
+_HOME = {'Y': 'p', 'O': 'q'}
+
+
+def _home_rows(rows, n_head=9):
+    out = []
+    for i, r in enumerate(rows):
+        r = r.replace('Y', 'h') if i < n_head else r
+        out.append(''.join(_HOME.get(ch, ch) if i >= n_head else ch for ch in r))
+    return out
+
+
+def _mk_mira(head, body, legs, home):
+    rows = head + body + legs
+    return Sprite(_home_rows(rows) if home else rows)
+
+
+_shout_head2 = list(_MIRA_HEAD)
+_shout_head2[7] = "..kYYhSsssek.."
+_mira_cache = {}
+
+
+def mira(pose='stand', home=False):
+    """pose: stand walk sit shout kneel"""
+    key = (pose, home)
+    if key in _mira_cache:
+        return _mira_cache[key]
+    if pose == 'sit':
+        s = MIRA_SIT if not home else Sprite(_home_rows([
+            "......kkkkk.......", ".....kYYYYYk......", "....kYYYYYYYk.....", "....kYYYhhhhhk....",
+            "....kYYhhhhsssk...", "....kYYhhhssesk...", "....kYYhhsssssk...", "....kYYYhSssssk...",
+            ".....kYYYSSssk....", ".....kOYYYk.......", "....kOYYYYYk.kkk..", "...kOYYYYYYskjjjk.",
+            "...kOYYYYYYskjjjk.", "...kOYYYYYYYkjjjk.", "...kOOYYYYYYkjjjk.", "..kjjOOOOOOkkRRRk.",
+            "..kkkkkkkkkkkRRRRk"]))
+    elif pose == 'walk':
+        s = _mk_mira(_MIRA_HEAD, _MIRA_BODY, _MIRA_WALK, home)
+    elif pose == 'shout':
+        s = _mk_mira(_shout_head2, ["..kOYYYYYYYYkk", "..kOYkYYYYYYss", "..kOYkYYYYYkkk",
+                                    "..kOYkYYYYYk..", "..kOYkYYYYYk.."], _MIRA_LEGS, home)
+    elif pose == 'kneel':
+        s = _mk_mira(_MIRA_HEAD, [], _MIRA_KNEEL, home)
+    else:
+        s = _mk_mira(_MIRA_HEAD, _MIRA_BODY, _MIRA_LEGS, home)
+    _mira_cache[key] = s
+    return s
+
+
+MIRA_BED_HEAD = Sprite([
+    "..kkkkk...",
+    ".khhhhhk..",
+    "khhhhsssk.",
+    "khhhsssesk",
+    "khhhssssk.",
+    ".khhSsssk.",
+    "..kkkkkk..",
+])
+
+_DADL_HEAD = [
+    "....kkkkk.....",
+    "...kHHHHHk....",
+    "..kHHHHHHHk...",
+    "..kHHsssssk...",
+    "..kHsGGsGGk...",
+    "..kHssssssk...",
+    "..kHHSssbbk...",
+    "...kSbbbbk....",
+]
+_ANDROID_HEAD = [
+    "....kkkkk.....",
+    "...kgggggk....",
+    "..kgwwwwwgk...",
+    "..kgwwwwwwk...",
+    "..kgwxxwxxk...",
+    "..kgwwwwwwk...",
+    "..kggdddddk...",
+    "...kgddddk....",
+]
+_DADL_BODY = ["..kkVVVVVVkk.."] + [".kVVVVVVVVVWk."] * 21 + [".kkVVVVVVVVkk."]
+_DADL_LEGS = {
+    'stand': ["...kJJkkJJk..."] * 7 + ["..kKKKkkKKKk.."],
+    'walk': ["...kJJkkJJk...", "..kJJk..kJJk..", "..kJJk..kJJk..", ".kJJk....kJJk.",
+             ".kJJk....kJJk.", ".kJJk....kJJk.", ".kJJk....kJJk.", "kKKKk....kKKKk"],
+}
+_dad_cache = {}
+
+
+def dad(pose='stand', look='lit'):
+    """look: silhouette | lit | fake | android"""
+    key = (pose, look)
+    if key in _dad_cache:
+        return _dad_cache[key]
+    if look == 'silhouette':
+        s = DAD[pose]
+    else:
+        head = {'lit': _DADL_HEAD, 'fake': _DADL_HEAD, 'android': _ANDROID_HEAD}[look]
+        pal = {'G': EYE_RED} if look == 'fake' else {}
+        s = Sprite(head + _DADL_BODY + _DADL_LEGS[pose], pal)
+    _dad_cache[key] = s
+    return s
+
+
+DEALER = Sprite([
+    ".....kkkkk......",
+    "....kQQQQQk.....",
+    "...kQQQQQQQk....",
+    "...kQQkkkkQk....",
+    "...kQkzzkzzk....",
+    "...kQkkkkkkk....",
+    "...kQQkkkkQk....",
+    "..kQQQQQQQQQk...",
+] + ["..kQQQQQQQQQk..."] * 4 + ["..kQQQQQQQQsk...", "..kQQQQQQQQsk..."] + ["..kQQQQQQQQQk..."] * 2
+  + [".kQQQQQQQQQQQk.."] * 10 + ["kQQQQQQQQQQQQQk."] * 6 + ["kkkkkkkkkkkkkkk."])
+
+
+def kid(coat=(90, 140, 200), hair=(98, 66, 46)):
+    return Sprite(_MIRA_HEAD + _MIRA_BODY + _MIRA_LEGS,
+                  {'Y': coat, 'O': tuple(int(c * 0.75) for c in coat), 'h': hair})
+
+
+# ------------------------------------------------------------------ vehicles & props (procedural)
+def van(w, x, ybot, label="NEXA", body=(222, 226, 236), stripe=(255, 64, 76), lights=False, t=0.0):
+    x, ybot = int(x), int(ybot)
+    k = (22, 18, 38)
+    rect(w, x, ybot - 22, x + 52, ybot - 4, body)
+    rect(w, x + 38, ybot - 28, x + 52, ybot - 20, body)          # cab roof
+    rect(w, x + 40, ybot - 26, x + 50, ybot - 19, (60, 90, 120))  # windshield
+    rect(w, x, ybot - 12, x + 52, ybot - 10, stripe)
+    m = text_mask(label)
+    _stamp(w, m, x + 6, ybot - 20, (40, 40, 60))
+    for wx in (x + 8, x + 40):
+        rect(w, wx, ybot - 6, wx + 7, ybot + 1, k)
+        rect(w, wx + 2, ybot - 4, wx + 5, ybot - 1, (120, 120, 140))
+    rect(w, x - 1, ybot - 22, x, ybot - 4, k)
+    rect(w, x + 52, ybot - 28, x + 53, ybot - 4, k)
+    rect(w, x, ybot - 23, x + 38, ybot - 22, k)
+    if lights:
+        on = int(t * 6) % 2
+        rect(w, x + 42, ybot - 30, x + 45, ybot - 28, (255, 60, 70) if on else (90, 30, 40))
+        rect(w, x + 46, ybot - 30, x + 49, ybot - 28, (60, 120, 255) if not on else (30, 40, 90))
+
+
+def ambulance(w, x, ybot, t=0.0):
+    van(w, x, ybot, label="", body=(236, 236, 240), stripe=(214, 52, 62), lights=True, t=t)
+    rect(w, x + 14, ybot - 20, x + 17, ybot - 13, (214, 52, 62))
+    rect(w, x + 12, ybot - 18, x + 19, ybot - 15, (214, 52, 62))
+
+
+def radio(w, x, ybot, glow=0.0):
+    x, ybot = int(x), int(ybot)
+    rect(w, x, ybot - 9, x + 16, ybot + 1, (110, 70, 50))
+    rect(w, x + 1, ybot - 8, x + 9, ybot, (60, 40, 34))
+    for yy in range(ybot - 7, ybot, 2):
+        rect(w, x + 2, yy, x + 8, yy + 1, (90, 64, 50))
+    rect(w, x + 10, ybot - 7, x + 15, ybot - 4, (255, 200, 110) if glow > 0.5 else (120, 96, 60))
+    px(w, x + 11 + int(glow * 3) % 4, ybot - 6, (200, 40, 40))
+    line(w, x + 14, ybot - 10, x + 20, ybot - 20, (150, 150, 170))
+    rect(w, x + 11, ybot - 2, x + 13, ybot, (40, 30, 26))

@@ -97,11 +97,14 @@ class Mix:
         self.L[i0:i1] = 0
         self.R[i0:i1] = 0
 
-    def write(self, path, peak=0.89):
+    def write(self, path, peak=0.89, gain=None):
         st = np.stack([self.L, self.R], axis=1)
-        m = np.abs(st).max()
-        if m > 0:
-            st = st / m * peak
+        if gain is not None:
+            st = np.tanh(st * gain)          # fixed level (soft clip) so chapters match
+        else:
+            m = np.abs(st).max()
+            if m > 0:
+                st = st / m * peak
         data = (st * 32767).astype('<i2')
         with wave.open(path, 'wb') as w:
             w.setnchannels(2)

@@ -45,6 +45,19 @@ PAL = {
     'r': (214, 52, 62),    # ball
     'l': (255, 176, 176),  # ball highlight
     'm': (140, 30, 44),    # ball shade
+    'p': (226, 120, 150),  # mira sweater
+    'q': (176, 82, 110),   # sweater shade
+    'H': (52, 40, 38),     # dad hair
+    'G': (40, 40, 56),     # glasses
+    'b': (74, 56, 50),     # beard
+    'V': (70, 98, 128),    # dad sweater
+    'W': (48, 70, 96),     # sweater shade
+    'J': (52, 58, 84),     # dad jeans
+    'K': (40, 30, 30),     # dad shoes
+    'Q': (40, 30, 52),     # cloak
+    'z': (120, 255, 150),  # goggles
+    'x': (255, 64, 76),    # android eye
+    'n': (98, 66, 46),     # kid hair
 }
 
 EYE_OFF = (36, 44, 58)
@@ -181,6 +194,19 @@ _FONT_SRC = {
     '_': "00000 00000 00000 00000 00000 00000 11111",
     '/': "00001 00010 00010 00100 01000 01000 10000",
     '#': "01010 11111 01010 01010 01010 11111 01010",
+    '"': "01010 01010 01010 00000 00000 00000 00000",
+    '(': "00010 00100 01000 01000 01000 00100 00010",
+    ')': "01000 00100 00010 00010 00010 00100 01000",
+    '+': "00000 00100 00100 11111 00100 00100 00000",
+    '%': "11001 11010 00010 00100 01000 01011 10011",
+    '>': "01000 00100 00010 00001 00010 00100 01000",
+    '<': "00010 00100 01000 10000 01000 00100 00010",
+    '=': "00000 00000 11111 00000 11111 00000 00000",
+    '*': "00000 10101 01110 11111 01110 10101 00000",
+    '[': "01110 01000 01000 01000 01000 01000 01110",
+    ']': "01110 00010 00010 00010 00010 00010 01110",
+    '|': "00100 00100 00100 00100 00100 00100 00100",
+    '&': "01100 10010 10100 01000 10101 10010 01101",
     ' ': "00000 00000 00000 00000 00000 00000 00000",
 }
 FONT = {ch: np.array([[c == '1' for c in row] for row in src.split()], dtype=bool)
@@ -234,11 +260,13 @@ def _stamp(dst, m, x0, y0, col):
 
 
 # --------------------------------------------------------------- camera
-def shoot(world, cx, cy, z):
-    """Render a 180x320 view of `world` centred on (cx, cy) world px at integer zoom z."""
+def shoot(world, cx, cy, z, size=None):
+    """Render a view of `world` centred on (cx, cy) world px at integer zoom z.
+    size=(w, h) of the low-res screen (default vertical 180x320)."""
+    ow, oh = size or (SW, SH)
     H, W = world.shape[:2]
-    vw, vh = SW / z, SH / z
-    assert W >= vw and H >= vh, "world smaller than view"
+    vw, vh = ow / z, oh / z
+    assert W >= vw and H >= vh, f"world {W}x{H} smaller than view {vw}x{vh}"
     x0 = min(max(cx - vw / 2, 0), W - vw)
     y0 = min(max(cy - vh / 2, 0), H - vh)
     px0, py0 = int(round(x0 * z)), int(round(y0 * z))
@@ -247,49 +275,104 @@ def shoot(world, cx, cy, z):
     wy1 = min(H, wy0 + int(np.ceil(vh)) + 2)
     big = world[wy0:wy1, wx0:wx1].repeat(z, 0).repeat(z, 1)
     ox, oy = px0 - wx0 * z, py0 - wy0 * z
-    out = np.zeros((SH, SW, 3), np.uint8)
-    crop = big[oy:oy + SH, ox:ox + SW]
+    out = np.zeros((oh, ow, 3), np.uint8)
+    crop = big[oy:oy + oh, ox:ox + ow]
     out[:crop.shape[0], :crop.shape[1]] = crop
     return out
 
 
 # --------------------------------------------------------------- screen effects
+_cache = {}
+
+
+def _bay(shape):
+    k = ('bay',) + shape[:2]
+    if k not in _cache:
+        _cache[k] = bayer(*shape[:2])
+    return _cache[k]
+
+
+def _vig(shape):
+    k = ('vig',) + shape[:2]
+    if k not in _cache:
+        h, w = shape[:2]
+        yy, xx = np.mgrid[0:h, 0:w]
+        _cache[k] = ((xx - w / 2) / (w / 2)) ** 2 * 0.55 + ((yy - h / 2) / (h / 2)) ** 2 * 0.55
+    return _cache[k]
+
+
 def rain(scr, t, seed=1, n=70, length=4, speed=230, slant=0.3, col=(120, 128, 178)):
+    h, w = scr.shape[:2]
     rng = np.random.default_rng(seed)
-    xs = rng.uniform(0, SW + 80, n)
-    ys = rng.uniform(0, SH + 20, n)
+    xs = rng.uniform(0, w + 80, n)
+    ys = rng.uniform(0, h + 20, n)
     sp = rng.uniform(0.85, 1.15, n)
     travel = ys + speed * sp * t
-    y = travel % (SH + 20) - 10
-    x = (xs - slant * travel) % (SW + 80) - 40
+    y = travel % (h + 20) - 10
+    x = (xs - slant * travel) % (w + 80) - 40
     k = np.arange(length)
     X = np.round(x[:, None] - slant * k[None, :]).astype(int).ravel()
     Y = np.round(y[:, None] + k[None, :]).astype(int).ravel()
-    ok = (X >= 0) & (X < SW) & (Y >= 0) & (Y < SH)
+    ok = (X >= 0) & (X < w) & (Y >= 0) & (Y < h)
     scr[Y[ok], X[ok]] = col
 
 
 def rain_layers(scr, t, strength=1.0):
-    rain(scr, t, seed=3, n=int(80 * strength), length=3, speed=190, col=(66, 72, 116))
-    rain(scr, t, seed=7, n=int(46 * strength), length=6, speed=330, col=(132, 142, 196))
+    a = scr.shape[0] * scr.shape[1] / (SW * SH)
+    rain(scr, t, seed=3, n=int(80 * strength * a), length=3, speed=190, col=(66, 72, 116))
+    rain(scr, t, seed=7, n=int(46 * strength * a), length=6, speed=330, col=(132, 142, 196))
 
 
-_yy, _xx = np.mgrid[0:SH, 0:SW]
-_VIG = ((_xx - SW / 2) / (SW / 2)) ** 2 * 0.55 + ((_yy - SH / 2) / (SH / 2)) ** 2 * 0.55
+def snow(scr, t, strength=1.0, seed=5):
+    h, w = scr.shape[:2]
+    a = h * w / (SW * SH)
+    for layer, (n, sp, col, sz) in enumerate(((int(90 * a * strength), 14, (150, 156, 196), 1),
+                                              (int(40 * a * strength), 26, (226, 230, 250), 2))):
+        rng = np.random.default_rng(seed + layer)
+        xs = rng.uniform(0, w, n)
+        ys = rng.uniform(0, h, n)
+        ph = rng.uniform(0, 6.28, n)
+        y = (ys + sp * t) % (h + 4) - 2
+        x = (xs + 6 * np.sin(t * 0.9 + ph) + 5 * t) % w
+        for xi, yi in zip(x.astype(int), y.astype(int)):
+            if 0 <= yi < h - sz + 1:
+                scr[yi:yi + sz, xi:xi + sz] = col
 
 
 def vignette(scr, strength=1.0):
-    m = (_VIG * strength) > (0.42 + 0.5 * SCREEN_BAYER)
+    v, b = _vig(scr.shape), _bay(scr.shape)
+    m = (v * strength) > (0.42 + 0.5 * b)
     scr[m] = (scr[m].astype(np.float32) * 0.62).astype(np.uint8)
-    m2 = (_VIG * strength) > (0.85 + 0.5 * SCREEN_BAYER)
+    m2 = (v * strength) > (0.85 + 0.5 * b)
     scr[m2] = (scr[m2].astype(np.float32) * 0.6).astype(np.uint8)
 
 
 def flash(scr, amount, col=(214, 220, 255)):
     if amount <= 0:
         return
-    m = SCREEN_BAYER < amount
+    m = _bay(scr.shape) < amount
     scr[m] = ((scr[m].astype(np.float32) + np.array(col)) / 2).astype(np.uint8)
+
+
+def fade(scr, amount):
+    """Dithered fade to black (amount 0..1)."""
+    if amount <= 0:
+        return
+    if amount >= 1:
+        scr[:] = 0
+        return
+    b = _bay(scr.shape)
+    scr[b < amount] = (scr[b < amount].astype(np.float32) * 0.25).astype(np.uint8)
+    scr[b < amount * 0.6] = 0
+
+
+def tint(scr, col, amount):
+    """Mix toward a colour (used for sepia flashbacks, night, sirens)."""
+    if amount <= 0:
+        return
+    lum = scr.astype(np.float32).mean(axis=2, keepdims=True)
+    target = lum * np.array(col, np.float32)
+    scr[:] = np.clip(scr * (1 - amount) + target * amount, 0, 255).astype(np.uint8)
 
 
 def scanlines(scr, k=0.8):
@@ -299,17 +382,18 @@ def scanlines(scr, k=0.8):
 def glitch(scr, rng, amt):
     if amt <= 0:
         return scr
+    h, w = scr.shape[:2]
     out = scr.copy()
     for _ in range(int(3 + 10 * amt)):
-        y0 = rng.integers(0, SH - 2)
-        h = rng.integers(1, int(4 + 14 * amt))
+        y0 = rng.integers(0, h - 2)
+        hh = rng.integers(1, int(4 + 14 * amt))
         dx = int(rng.integers(-int(4 + 26 * amt), int(5 + 26 * amt)))
-        out[y0:y0 + h] = np.roll(out[y0:y0 + h], dx, axis=1)
+        out[y0:y0 + hh] = np.roll(out[y0:y0 + hh], dx, axis=1)
     sh = int(1 + 3 * amt)
     out[..., 0] = np.roll(out[..., 0], sh, axis=1)
     out[..., 2] = np.roll(out[..., 2], -sh, axis=1)
     for _ in range(int(6 * amt)):
-        x, y = rng.integers(0, SW - 10), rng.integers(0, SH - 4)
+        x, y = rng.integers(0, w - 10), rng.integers(0, h - 4)
         out[y:y + rng.integers(1, 4), x:x + rng.integers(3, 20)] = rng.choice(
             [(96, 236, 255), (255, 64, 76), (240, 240, 255), (10, 10, 20)])
     return out
