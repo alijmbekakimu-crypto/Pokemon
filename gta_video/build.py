@@ -109,6 +109,71 @@ def _lowpass(x, a):
     return lfilter([1 - a], [1, -a], x)
 
 
+# ---------- вставка записей геймплея ----------
+# Свои записи игры кладутся в clips/<сцена>/ (например clips/prison/*.mp4).
+# Если для сцены есть клипы, они заменяют нарисованный фон: режутся на
+# короткие куски (CUT сек) и чередуются, чтобы картинка часто менялась.
+
+CLIPS = os.path.join(HERE, "clips")
+CUT = 3.2           # длина одного куска, сек
+SKIP_START = 1.0    # пропустить начало каждого файла (меню, загрузка)
+VIDEO_EXT = (".mp4", ".mov", ".mkv", ".webm", ".avi")
+
+
+def find_clips(scene):
+    folder = os.path.join(CLIPS, scene)
+    if not os.path.isdir(folder):
+        return []
+    return sorted(os.path.join(folder, f) for f in os.listdir(folder) if f.lower().endswith(VIDEO_EXT))
+
+
+def probe_duration(path):
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path],
+                         capture_output=True, text=True, check=True).stdout.strip()
+    return float(out or 0)
+
+
+def clip_segment(clips, dur_v, w, h, vertical, seg, tag):
+    """Нарезка клипов в сегмент главы длиной dur_v (звук игры не берём —
+    в нём бывает музыка с радио, на которую YouTube выдаёт претензии)."""
+    lens = {c: probe_duration(c) for c in clips}
+    offsets = {c: SKIP_START for c in clips}
+    n = max(1, round(dur_v / CUT))
+    piece = dur_v / n
+    if vertical:  # вертикаль: размытый фон + кадр игры по ширине в центре
+        vf = (f"split[a][b];[a]scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},"
+              f"boxblur=30:2,eq=brightness=-0.15[bg];[b]scale={w}:-2[fg];"
+              f"[bg][fg]overlay=0:(H-h)/2-120")
+    else:
+        vf = f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h}"
+    parts = []
+    for i in range(n):
+        c = clips[i % len(clips)]
+        if offsets[c] + piece > lens[c]:
+            offsets[c] = min(SKIP_START, max(0, lens[c] - piece))
+        start = offsets[c]
+        offsets[c] += piece + 0.6
+        # лёгкий наезд или отъезд камеры на каждом куске
+        z = "1+0.0006*on" if i % 2 == 0 else "1.06-0.0006*on"
+        part = os.path.join(BUILD, f"part_{tag}_{i:03d}.mp4")
+        run(["ffmpeg", "-y", "-ss", f"{start:.3f}", "-t", f"{piece + 0.1:.3f}", "-i", c, "-an",
+             "-filter_complex",
+             f"[0:v]fps={FPS},{vf},zoompan=z='{z}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
+             f":d=1:s={w}x{h}:fps={FPS},setsar=1,format=yuv420p",
+             "-frames:v", str(int(round(piece * FPS))),
+             "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", part])
+        parts.append(part)
+    lst = os.path.join(BUILD, f"parts_{tag}.txt")
+    with open(lst, "w") as f:
+        f.writelines(f"file '{p}'\n" for p in parts)
+    run(["ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", lst,
+         "-vf", f"fade=t=in:st=0:d=0.3,fade=t=out:st={dur_v - 0.4:.3f}:d=0.4,format=yuv420p",
+         "-frames:v", str(int(round(dur_v * FPS))), "-r", str(FPS),
+         "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", seg])
+    for p in parts:
+        os.remove(p)
+
+
 # ---------- субтитры (ASS) ----------
 
 def ts(sec):
@@ -193,16 +258,20 @@ def build(mode):
         seg = os.path.join(BUILD, f"seg_{mode}_{ci:02d}.mp4")
         frames = int(round(dur * FPS))
         dur_v = frames / FPS
-        if vertical:
-            x = f"(iw-ow)/2+(iw-ow)/2*sin(t/{dur_v:.3f}*PI-PI/2)*{1 if ci % 2 else -1}"
-            y = f"(ih-oh)*{'t' if ci % 2 else f'({dur_v:.3f}-t)'}/{dur_v:.3f}"
+        clips = find_clips(ch["scene"])
+        if clips:
+            clip_segment(clips, dur_v, w, h, vertical, seg, f"{mode}_{ci:02d}")
         else:
-            x = f"(iw-ow)*{'t' if ci % 2 == 0 else f'({dur_v:.3f}-t)'}/{dur_v:.3f}"
-            y = "(ih-oh)/2"
-        run(["ffmpeg", "-y", "-loop", "1", "-framerate", str(FPS), "-i", bg, "-frames:v", str(frames),
-             "-vf", f"crop={w}:{h}:x='{x}':y='{y}',fade=t=in:st=0:d=0.4,"
-                    f"fade=t=out:st={dur_v - 0.4:.3f}:d=0.4,format=yuv420p",
-             "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-r", str(FPS), seg])
+            if vertical:
+                x = f"(iw-ow)/2+(iw-ow)/2*sin(t/{dur_v:.3f}*PI-PI/2)*{1 if ci % 2 else -1}"
+                y = f"(ih-oh)*{'t' if ci % 2 else f'({dur_v:.3f}-t)'}/{dur_v:.3f}"
+            else:
+                x = f"(iw-ow)*{'t' if ci % 2 == 0 else f'({dur_v:.3f}-t)'}/{dur_v:.3f}"
+                y = "(ih-oh)/2"
+            run(["ffmpeg", "-y", "-loop", "1", "-framerate", str(FPS), "-i", bg, "-frames:v", str(frames),
+                 "-vf", f"crop={w}:{h}:x='{x}':y='{y}',fade=t=in:st=0:d=0.4,"
+                        f"fade=t=out:st={dur_v - 0.4:.3f}:d=0.4,format=yuv420p",
+                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "16", "-r", str(FPS), seg])
         segments.append(seg)
         # синхронизируем звук с точной длиной видео
         voice[-1] = np.pad(audio, (0, max(0, int(dur_v * SR) - len(audio))))[: int(dur_v * SR)]
