@@ -13,7 +13,14 @@ the state of Leonida and Vice City, Lucia Caminos and Jason Duval, the "modern B
 setup, the supporting cast — plus two fan theories (speculation only!).
 
 Chapters:
-__CHAPTERS__
+00:00 Intro
+00:14 Leonida & Vice City
+00:43 Lucia Caminos
+00:58 Jason Duval
+01:12 Bonnie & Clyde
+01:34 The crew
+01:54 Fan theories
+02:13 Release date
 
 Which theory do you believe? Let me know in the comments 👇
 Subscribe for the full story breakdown after launch.
