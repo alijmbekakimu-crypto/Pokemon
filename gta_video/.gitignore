@@ -1,0 +1,9 @@
+build/
+output/*.mp4
+__pycache__/
+clips/**/*.mp4
+clips/**/*.mov
+clips/**/*.mkv
+clips/**/*.webm
+clips/**/*.avi
+output/highlights/
