@@ -309,7 +309,8 @@ def build(mode):
 
     total = cur
     vo = np.concatenate(voice)
-    mu = music(total)[: len(vo)]
+    mu = music(total)
+    mu = np.pad(mu, (0, max(0, len(vo) - len(mu))))[: len(vo)]  # выравниваем после округления
     # приглушаем музыку, когда говорит диктор
     env = np.abs(vo)
     k = int(0.25 * SR)

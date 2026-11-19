@@ -400,7 +400,7 @@ def beach_vice(rng):
         x = rng.randint(0, W)
         d.rectangle([x, y, x + rng.randint(40, 120), y + 3], fill=(220, 255, 255))
     for x in range(int(W * 0.05), W, int(W * 0.17)):
-        palm(img, x + rng.randint(-40, 40), H + 30, rng.randint(int(H * 0.55), int(H * 0.75)),
+        palm(img, x + rng.randint(-40, 40), H + 30, rng.randint(int(min(W, H) * 0.55), int(min(W, H) * 0.75)),
              (30, 60, 50), lean=rng.uniform(-0.25, 0.25))
     return img
 
