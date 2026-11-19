@@ -6,3 +6,4 @@ clips/**/*.mov
 clips/**/*.mkv
 clips/**/*.webm
 clips/**/*.avi
+output/highlights/
