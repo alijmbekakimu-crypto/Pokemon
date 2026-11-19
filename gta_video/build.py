@@ -14,7 +14,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 import scenes
-from script import CHAPTERS, CHAPTERS_EN, SHORT, SHORT_EN, TTS_FIXES
+from script import CHAPTERS, CHAPTERS_EN, SHORT, SHORT_EN, TIKTOK_PARTS, TTS_FIXES
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 BUILD = os.path.join(HERE, "build")
@@ -32,6 +32,9 @@ MODES = {
     "long_en": dict(chapters=CHAPTERS_EN, size=(1920, 1080), bg=(2304, 1296), name="gta6_story_explained_EN.mp4"),
     "short_en": dict(chapters=SHORT_EN, size=(1080, 1920), bg=(1296, 2304), name="gta6_short_EN.mp4"),
 }
+for _i, _part in enumerate(TIKTOK_PARTS, 1):
+    MODES[f"tt{_i}"] = dict(chapters=_part, size=(1080, 1920), bg=(1296, 2304),
+                            name=f"tiktok_gta6_part{_i}.mp4")
 VOICE_EN = os.path.join(HERE, "voice_en")
 
 
@@ -240,7 +243,12 @@ def build(mode):
     cur = 0.0
     for ci, ch in enumerate(chapters):
         intro = ch.get("intro")
-        lead = 2.6 if intro else 1.6
+        if not ch["title"]:
+            lead = 0.3
+        elif intro:
+            lead = 0.6 if mode.startswith("tt") else 2.6  # в TikTok крючок сразу
+        else:
+            lead = 1.6
         ch_start = cur
         chunk = [np.zeros(int(lead * SR), np.float32)]
         t = cur + lead
@@ -266,7 +274,7 @@ def build(mode):
                 events.append(("HeroSub", ch_start + 0.8, ch_start + lead + 1.2,
                                "{\\fad(500,500)}" + ch["subtitle"].upper(),
                                f"\\pos({w // 2},{int(h * (0.5 if vertical else 0.6))})"))
-        else:
+        elif ch["title"]:
             end = min(ch_start + dur - 0.4, ch_start + lead + 3.5)
             events.append(("Title", ch_start + 0.2, end, "{\\fad(400,400)}" + ch["title"], ""))
             if ch["subtitle"]:
@@ -362,6 +370,9 @@ def thumb(lines=("ЧТО ИЗВЕСТНО", "О СЮЖЕТЕ"), name="gta6_thumb
 
 if __name__ == "__main__":
     what = sys.argv[1:] or ["long", "short", "thumb"]
+    if "tiktok" in what:  # tiktok = все части серии
+        i = what.index("tiktok")
+        what[i:i + 1] = [f"tt{k}" for k in range(1, len(TIKTOK_PARTS) + 1)]
     for m in what:
         if m == "thumb":
             thumb()
